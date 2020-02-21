@@ -41,7 +41,7 @@ type PathInfo struct {
 	ID   int           `json:"id"`
 	From string        `json:"from"`
 	To   string        `json:"to"`
-	Path []PathElement `json:"path"`
+	Path []PathElement `json:"path,omitempty"`
 }
 
 func readJSONFile(filename string) ([]*User, error) {
@@ -145,6 +145,10 @@ func findShortestPath(from string, to string, contacts map[string][]string) []st
 }
 
 func makePathInfo(id int, from string, to string, path []string, created map[string]string) PathInfo {
+	if path == nil || from == to {
+		return PathInfo{id, from, to, nil}
+	}
+
 	plots := make([]PathElement, 0)
 	for i := 1; i < len(path)-1; i++ {
 		email := path[i]
