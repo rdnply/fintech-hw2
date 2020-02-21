@@ -69,14 +69,17 @@ func readCSVFile(filePath string) ([][]string, error) {
 func parseContacts(users []*User) map[string][]string {
 	contacts := make(map[string][]string)
 	for _, user := range users {
-		contacts[user.Email] = make([]string, 0)
 		for _, sub := range user.Subs {
-			contacts[user.Email] = append(contacts[user.Email], sub.Email)
+			if _, ok := contacts[sub.Email]; !ok {
+				contacts[sub.Email] = make([]string, 0)
+			}
+			contacts[sub.Email] = append(contacts[sub.Email], user.Email)
 		}
 	}
 
 	return contacts
 }
+
 
 func breadthFirstSearch(start string, contacts map[string][]string) (map[string]void, map[string]string) {
 	visited := make(map[string]void)
@@ -135,7 +138,7 @@ func main() {
 
 	contacts := parseContacts(users)
 
-	path := findShortestPath("seal969@rambler.ru", "tomcat1445@rambler.ru", contacts)
+	path := findShortestPath("mako1332@rambler.ru", "mosquito371@mail.ru", contacts)
 
 	for _, el := range path {
 		fmt.Println(el)
