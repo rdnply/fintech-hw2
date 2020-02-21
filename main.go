@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,6 +12,8 @@ import (
 
 const (
 	StartParent string = "startParent"
+	First       int    = 0
+	Second      int    = 1
 )
 
 type void struct{}
@@ -29,6 +30,18 @@ type User struct {
 	Email     string       `json:"Email"`
 	CreatedAt string       `json:"Created_at"`
 	Subs      []Subscriber `json:"Subscribers"`
+}
+
+type PathElement struct {
+	Email     string `json:"email"`
+	CreatedAt string `json:"created_at"`
+}
+
+type PathInfo struct {
+	ID   int           `json:"id"`
+	From string        `json:"from"`
+	To   string        `json:"to"`
+	Path []PathElement `json:"path"`
 }
 
 func readJSONFile(filename string) ([]*User, error) {
@@ -66,9 +79,11 @@ func readCSVFile(filePath string) ([][]string, error) {
 	return records, nil
 }
 
-func parseContacts(users []*User) map[string][]string {
+func parseUsers(users []*User) (map[string][]string, map[string]string) {
 	contacts := make(map[string][]string)
+	created := make(map[string]string)
 	for _, user := range users {
+		created[user.Email] = user.CreatedAt
 		for _, sub := range user.Subs {
 			if _, ok := contacts[sub.Email]; !ok {
 				contacts[sub.Email] = make([]string, 0)
@@ -77,9 +92,8 @@ func parseContacts(users []*User) map[string][]string {
 		}
 	}
 
-	return contacts
+	return contacts, created
 }
-
 
 func breadthFirstSearch(start string, contacts map[string][]string) (map[string]void, map[string]string) {
 	visited := make(map[string]void)
@@ -130,17 +144,49 @@ func findShortestPath(from string, to string, contacts map[string][]string) []st
 	return path
 }
 
+func makePathInfo(id int, from string, to string, path []string, created map[string]string) PathInfo {
+	plots := make([]PathElement, 0)
+	for i := 1; i < len(path)-1; i++ {
+		email := path[i]
+		date := created[email]
+		plots = append(plots, PathElement{email, date})
+	}
+
+	return PathInfo{id, from, to, plots}
+}
+
+func findPaths(betweenUsers [][]string, users []*User) []PathInfo {
+	contacts, created := parseUsers(users)
+	paths := make([]PathInfo, 0)
+	for id, between := range betweenUsers {
+		path := findShortestPath(between[First], between[Second], contacts)
+		pathInfo := makePathInfo(id+1, between[First], between[Second], path, created)
+		paths = append(paths, pathInfo)
+	}
+
+	return paths
+}
+
 func main() {
 	users, err := readJSONFile("users.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	contacts := parseContacts(users)
+	betweenUsers, err := readCSVFile("input.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	path := findShortestPath("mako1332@rambler.ru", "mosquito371@mail.ru", contacts)
+	paths := findPaths(betweenUsers, users)
 
-	for _, el := range path {
-		fmt.Println(el)
+	jsonPaths, err := json.Marshal(paths)
+	if err != nil {
+		log.Fatalf("can't write as json format ")
+	}
+
+	err = ioutil.WriteFile("result.json", jsonPaths, 0644)
+	if err != nil {
+		log.Fatalln("can't write json data in file")
 	}
 }
