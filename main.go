@@ -14,11 +14,10 @@ const (
 	StartParent string = "startParent"
 	First       int    = 0
 	Second      int    = 1
+	StartID     int    = 1
 )
 
 type void struct{}
-
-var member void
 
 type Subscriber struct {
 	Email     string `json:"Email"`
@@ -57,7 +56,11 @@ func readJSONFile(filename string) ([]*User, error) {
 	}
 
 	var users []*User
-	json.Unmarshal(byteData, &users)
+	err = json.Unmarshal(byteData, &users)
+
+	if err != nil {
+		return nil, errors.New("cant't unmarshal byte data in json")
+	}
 
 	return users, nil
 }
@@ -82,12 +85,15 @@ func readCSVFile(filePath string) ([][]string, error) {
 func parseUsers(users []*User) (map[string][]string, map[string]string) {
 	contacts := make(map[string][]string)
 	created := make(map[string]string)
+
 	for _, user := range users {
 		created[user.Email] = user.CreatedAt
+
 		for _, sub := range user.Subs {
 			if _, ok := contacts[sub.Email]; !ok {
 				contacts[sub.Email] = make([]string, 0)
 			}
+
 			contacts[sub.Email] = append(contacts[sub.Email], user.Email)
 		}
 	}
@@ -97,7 +103,9 @@ func parseUsers(users []*User) (map[string][]string, map[string]string) {
 
 func breadthFirstSearch(start string, contacts map[string][]string) (map[string]void, map[string]string) {
 	visited := make(map[string]void)
-	visited[start] = member
+
+	var yes void
+	visited[start] = yes
 
 	parent := make(map[string]string)
 	parent[start] = StartParent
@@ -108,23 +116,34 @@ func breadthFirstSearch(start string, contacts map[string][]string) (map[string]
 	for queue.Len() > 0 {
 		node := queue.Front()
 		email := node.Value.(string)
+
 		for _, to := range contacts[email] {
 			if _, ok := visited[to]; !ok {
-				visited[to] = member
+				visited[to] = yes
+
 				queue.PushBack(to)
+
 				parent[to] = email
 			}
 		}
+
 		queue.Remove(node)
 	}
 
 	return visited, parent
 }
 
-func reversePath(path []string) {
-	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
-		path[i], path[j] = path[j], path[i]
+// nolint: gomnd
+func reversePath(path []string) []string {
+	rev := make([]string, len(path))
+	j := len(path) - 1
+
+	for _, v := range path {
+		rev[j] = v
+		j--
 	}
+
+	return rev
 }
 
 func findShortestPath(from string, to string, contacts map[string][]string) []string {
@@ -134,14 +153,14 @@ func findShortestPath(from string, to string, contacts map[string][]string) []st
 		return nil
 	}
 
-	path := make([]string, 0)
+	revPath := make([]string, 0)
 	for v := to; v != StartParent; v = parent[v] {
-		path = append(path, v)
+		revPath = append(revPath, v)
 	}
 
-	reversePath(path)
+	normalPath := reversePath(revPath)
 
-	return path
+	return normalPath
 }
 
 func makePathInfo(id int, from string, to string, path []string, created map[string]string) PathInfo {
@@ -150,6 +169,7 @@ func makePathInfo(id int, from string, to string, path []string, created map[str
 	}
 
 	plots := make([]PathElement, 0)
+
 	for i := 1; i < len(path)-1; i++ {
 		email := path[i]
 		date := created[email]
@@ -162,10 +182,13 @@ func makePathInfo(id int, from string, to string, path []string, created map[str
 func findPaths(betweenUsers [][]string, users []*User) []PathInfo {
 	contacts, created := parseUsers(users)
 	paths := make([]PathInfo, 0)
-	for id, between := range betweenUsers {
+	id := StartID
+
+	for _, between := range betweenUsers {
 		path := findShortestPath(between[First], between[Second], contacts)
-		pathInfo := makePathInfo(id+1, between[First], between[Second], path, created)
+		pathInfo := makePathInfo(id, between[First], between[Second], path, created)
 		paths = append(paths, pathInfo)
+		id++
 	}
 
 	return paths
