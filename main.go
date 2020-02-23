@@ -4,17 +4,17 @@ import (
 	"container/list"
 	"encoding/csv"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 )
 
 const (
-	StartParent string = "startParent"
-	First       int    = 0
-	Second      int    = 1
-	StartID     int    = 1
+	First = iota
+	Second
+	StartParent = "startParent"
+	StartID     = 1
 )
 
 type void struct{}
@@ -31,52 +31,58 @@ type User struct {
 	Subs      []Subscriber `json:"Subscribers"`
 }
 
-type PathElement struct {
-	Email     string `json:"email"`
-	CreatedAt string `json:"created_at"`
-}
-
 type PathInfo struct {
-	ID   int           `json:"id"`
-	From string        `json:"from"`
-	To   string        `json:"to"`
-	Path []PathElement `json:"path,omitempty"`
+	ID   int          `json:"id"`
+	From string       `json:"from"`
+	To   string       `json:"to"`
+	Path []Subscriber `json:"path,omitempty"`
 }
 
-func readJSONFile(filename string) ([]*User, error) {
-	f, err := os.Open(filename)
+func (s *Subscriber) MarshalJSON() ([]byte, error) {
+	type alias struct {
+		Email     string `json:"email"`
+		CreatedAt string `json:"created_at"`
+	}
+
+	var a alias = alias(*s)
+
+	return json.Marshal(&a)
+}
+
+func readJSONFile(fileName string) ([]*User, error) {
+	f, err := os.Open(fileName)
 	if err != nil {
-		return nil, errors.New("unable to read input json file " + filename)
+		return nil, fmt.Errorf("unable to read input json file %s, %v", fileName, err)
 	}
 	defer f.Close()
 
 	byteData, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, errors.New("unable to read input json file as a byte array " + filename)
+		return nil, fmt.Errorf("unable to read input json file as a byte array %s, %v", fileName, err)
 	}
 
 	var users []*User
-	err = json.Unmarshal(byteData, &users)
 
+	err = json.Unmarshal(byteData, &users)
 	if err != nil {
-		return nil, errors.New("cant't unmarshal byte data in json")
+		return nil, fmt.Errorf("can't unmarshal byte data in json %v", err)
 	}
 
 	return users, nil
 }
 
-func readCSVFile(filePath string) ([][]string, error) {
-	f, err := os.Open(filePath)
+func readCSVFile(fileName string) ([][]string, error) {
+	f, err := os.Open(fileName)
 	if err != nil {
-		return nil, errors.New("unable to read input file " + filePath)
+		return nil, fmt.Errorf("unable to read input file %s, %v", fileName, err)
 	}
 	defer f.Close()
 
 	csvReader := csv.NewReader(f)
-	records, err := csvReader.ReadAll()
 
+	records, err := csvReader.ReadAll()
 	if err != nil {
-		return nil, errors.New("unable to parse file as CSV for " + filePath)
+		return nil, fmt.Errorf("unable to parse file as CSV for %s, %v", fileName, err)
 	}
 
 	return records, nil
@@ -168,12 +174,12 @@ func makePathInfo(id int, from string, to string, path []string, created map[str
 		return PathInfo{id, from, to, nil}
 	}
 
-	plots := make([]PathElement, 0)
+	plots := make([]Subscriber, 0)
 
 	for i := 1; i < len(path)-1; i++ {
 		email := path[i]
 		date := created[email]
-		plots = append(plots, PathElement{email, date})
+		plots = append(plots, Subscriber{email, date})
 	}
 
 	return PathInfo{id, from, to, plots}
