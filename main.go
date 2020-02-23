@@ -16,8 +16,6 @@ const (
 	StartID     = 1
 )
 
-type void struct{}
-
 type Subscriber struct {
 	Email     string `json:"Email"`
 	CreatedAt string `json:"Created_at"`
@@ -106,10 +104,10 @@ func parseUsers(users []*User) (map[string][]string, map[string]string) {
 	return contacts, created
 }
 
-func breadthFirstSearch(start string, contacts map[string][]string) (map[string]void, map[string]string) {
-	visited := make(map[string]void)
+func breadthFirstSearch(start string, contacts map[string][]string) (map[string]struct{}, map[string]string) {
+	visited := make(map[string]struct{})
 
-	var yes void
+	var yes struct{}
 	visited[start] = yes
 
 	parent := make(map[string]string)
