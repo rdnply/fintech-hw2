@@ -35,6 +35,11 @@ type PathInfo struct {
 	Path []Subscriber `json:"path,omitempty"`
 }
 
+type UserInfo struct {
+	createdAt string
+	subs      []string
+}
+
 func (s *Subscriber) MarshalJSON() ([]byte, error) {
 	type alias struct {
 		Email     string `json:"email"`
@@ -85,26 +90,27 @@ func readCSVFile(fileName string) ([][]string, error) {
 	return records, nil
 }
 
-func parseUsers(users []*User) (map[string][]string, map[string]string) {
-	contacts := make(map[string][]string)
-	created := make(map[string]string)
+func appendSub(u *UserInfo, sub string) {
+	u.subs = append(u.subs, sub)
+}
+
+func parseUsers(users []*User) map[string]*UserInfo {
+	info := make(map[string]*UserInfo)
 
 	for _, user := range users {
-		created[user.Email] = user.CreatedAt
-
 		for _, sub := range user.Subs {
-			if _, ok := contacts[sub.Email]; !ok {
-				contacts[sub.Email] = make([]string, 0)
+			if _, ok := info[sub.Email]; !ok {
+				info[sub.Email] = &UserInfo{sub.CreatedAt, make([]string, 0)}
 			}
 
-			contacts[sub.Email] = append(contacts[sub.Email], user.Email)
+			appendSub(info[sub.Email], user.Email)
 		}
 	}
 
-	return contacts, created
+	return info
 }
 
-func breadthFirstSearch(start string, contacts map[string][]string) (map[string]struct{}, map[string]string) {
+func breadthFirstSearch(start string, info map[string]*UserInfo) (map[string]struct{}, map[string]string) {
 	visited := make(map[string]struct{})
 
 	var yes struct{}
@@ -119,12 +125,14 @@ func breadthFirstSearch(start string, contacts map[string][]string) (map[string]
 	for len(queue) > 0 {
 		email := queue[First]
 
-		for _, to := range contacts[email] {
-			if _, ok := visited[to]; !ok {
-				visited[to] = yes
+		if user, ok := info[email]; ok {
+			for _, to := range user.subs {
+				if _, ok := visited[to]; !ok {
+					visited[to] = yes
 
-				queue = append(queue, to)
-				parent[to] = email
+					queue = append(queue, to)
+					parent[to] = email
+				}
 			}
 		}
 
@@ -147,8 +155,8 @@ func reversePath(path []string) []string {
 	return rev
 }
 
-func findShortestPath(from string, to string, contacts map[string][]string) []string {
-	visited, parent := breadthFirstSearch(from, contacts)
+func findShortestPath(from string, to string, info map[string]*UserInfo) []string {
+	visited, parent := breadthFirstSearch(from, info)
 
 	if _, ok := visited[to]; !ok {
 		return nil
@@ -164,7 +172,7 @@ func findShortestPath(from string, to string, contacts map[string][]string) []st
 	return normalPath
 }
 
-func makePathInfo(id int, from string, to string, path []string, created map[string]string) PathInfo {
+func makePathInfo(id int, from string, to string, path []string, info map[string]*UserInfo) PathInfo {
 	if path == nil || from == to {
 		return PathInfo{id, from, to, nil}
 	}
@@ -173,7 +181,7 @@ func makePathInfo(id int, from string, to string, path []string, created map[str
 
 	for i := 1; i < len(path)-1; i++ {
 		email := path[i]
-		date := created[email]
+		date := info[email].createdAt
 		plots = append(plots, Subscriber{email, date})
 	}
 
@@ -181,13 +189,13 @@ func makePathInfo(id int, from string, to string, path []string, created map[str
 }
 
 func findPaths(betweenUsers [][]string, users []*User) []PathInfo {
-	contacts, created := parseUsers(users)
+	info := parseUsers(users)
 	paths := make([]PathInfo, 0)
 	id := StartID
 
 	for _, between := range betweenUsers {
-		path := findShortestPath(between[First], between[Second], contacts)
-		pathInfo := makePathInfo(id, between[First], between[Second], path, created)
+		path := findShortestPath(between[First], between[Second], info)
+		pathInfo := makePathInfo(id, between[First], between[Second], path, info)
 		paths = append(paths, pathInfo)
 		id++
 	}
