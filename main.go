@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/list"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -116,24 +115,22 @@ func breadthFirstSearch(start string, contacts map[string][]string) (map[string]
 	parent := make(map[string]string)
 	parent[start] = StartParent
 
-	queue := list.New()
-	queue.PushBack(start)
+	queue := make([]string, 0)
+	queue = append(queue, start)
 
-	for queue.Len() > 0 {
-		node := queue.Front()
-		email := node.Value.(string)
+	for len(queue) > 0 {
+		email := queue[First]
 
 		for _, to := range contacts[email] {
 			if _, ok := visited[to]; !ok {
 				visited[to] = yes
 
-				queue.PushBack(to)
-
+				queue = append(queue, to)
 				parent[to] = email
 			}
 		}
 
-		queue.Remove(node)
+		queue = queue[1:]
 	}
 
 	return visited, parent
